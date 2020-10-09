@@ -34,4 +34,4 @@ Usage:
 
 ### References:
 
-1. C. Penrose, "Frequency Shaping of Audio Signals" (ICMC 2001) [link](https://quod.lib.umich.edu/cgi/p/pod/dod-idx/frequency-shaping-of-audio-signals.pdf?c=icmc&format=pdf&idno=bbp2372.2001.082)
+1. C. Penrose, "Frequency Shaping of Audio Signals" (ICMC 2001) [[link]](https://quod.lib.umich.edu/cgi/p/pod/dod-idx/frequency-shaping-of-audio-signals.pdf?c=icmc&format=pdf&idno=bbp2372.2001.082)
