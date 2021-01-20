@@ -59,7 +59,7 @@ Shapee::AudioBuffer Shapee::shape(AudioBuffer& freq_src, AudioBuffer& ampl_src)
 
         std::mutex result_lock;
 
-// #pragma omp parallel for
+#pragma omp parallel for
         for (int i = 0; i < result_len; ++i) {
             // Compute polar form of spectrogram frame
             FFTBins freq_polar(freq_spec.at(i).size());
@@ -199,7 +199,7 @@ Shapee::Wave Shapee::get_window(const Wave& wave, int base_idx)
 Shapee::Wave Shapee::median_filter(const Wave& wave, int width) {
     Wave result(wave.size(), 0);
 
-// #pragma omp parallel for
+#pragma omp parallel for
     for (int i = 0; i < wave.size(); ++i) {
         int beg_idx = std::max(0, i - width);
         int end_idx = std::min(static_cast<int>(wave.size()-1), i + width);
@@ -257,7 +257,6 @@ Shapee::FFTBins Shapee::compute_fft(Wave& wave)
     FFTBins bins(wave.size());
 
     for (int i = 0; i < wave.size(); ++i) {
-        // in[i] = wave.at(i);
         _fftw_double_data[i] = wave.at(i);
     }
 
