@@ -9,6 +9,7 @@
 
 #include <complex>
 #include <vector>
+#include "/usr/local/include/fftw3.h"
 
 class Shapee
 {
@@ -19,6 +20,7 @@ class Shapee
     typedef std::vector<FFTBins> Spectrogram;
 
     Shapee(int window_size, int hop_size, float w);
+    ~Shapee();
 
     AudioBuffer shape(AudioBuffer& freq_src, AudioBuffer& ampl_src);
 
@@ -37,6 +39,11 @@ class Shapee
 
     int _window_size, _hop_size;
     float _w;
+
+    double* _fftw_double_data;
+    fftw_complex* _fftw_complex_data;
+    fftw_plan _fft_plan;
+    fftw_plan _ifft_plan;
 };
 
 #endif /* SHAPEE_HPP */

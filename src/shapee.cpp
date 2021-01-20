@@ -5,14 +5,25 @@
  */
 
 #include "shapee.hpp"
-#include "mkl.h"
 #include <iostream>
 #include <mutex>
-#include <omp.h>
+#include "/opt/homebrew/Cellar/libomp/11.0.1/include/omp.h"
 
 Shapee::Shapee(int window_size, int hop_size, float w)
     : _window_size(window_size), _hop_size(hop_size), _w(w)
 {
+    _fftw_double_data = (double*) fftw_malloc(sizeof(double) * _window_size);
+    _fftw_complex_data = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * _window_size);
+    _fft_plan = fftw_plan_dft_r2c_1d(_window_size, _fftw_double_data, _fftw_complex_data, FFTW_ESTIMATE);
+    _ifft_plan = fftw_plan_dft_c2r_1d(_window_size, _fftw_complex_data, _fftw_double_data, FFTW_ESTIMATE);
+}
+
+Shapee::~Shapee()
+{
+    fftw_destroy_plan(_fft_plan);
+    fftw_destroy_plan(_ifft_plan);
+    fftw_free(_fftw_double_data);
+    fftw_free(_fftw_complex_data);
 }
 
 Shapee::AudioBuffer Shapee::shape(AudioBuffer& freq_src, AudioBuffer& ampl_src)
@@ -48,7 +59,7 @@ Shapee::AudioBuffer Shapee::shape(AudioBuffer& freq_src, AudioBuffer& ampl_src)
 
         std::mutex result_lock;
 
-#pragma omp parallel for
+// #pragma omp parallel for
         for (int i = 0; i < result_len; ++i) {
             // Compute polar form of spectrogram frame
             FFTBins freq_polar(freq_spec.at(i).size());
@@ -125,7 +136,7 @@ Shapee::Spectrogram Shapee::compute_stft(Wave& wave)
 
     std::mutex spec_lock;
 
-#pragma omp parallel for
+// #pragma omp parallel for
     for (int i = 0; i < wave.size(); i += _hop_size) {
         // Get window
         Wave window = get_window(wave, i);
@@ -149,7 +160,7 @@ Shapee::Wave Shapee::compute_istft(Spectrogram& spec)
 
     std::mutex wave_lock;
 
-#pragma omp parallel for
+// #pragma omp parallel for
     for (int i = 0; i < spec.size(); ++i) {
         // Compute inverse FFT of current frame
         Wave window = compute_ifft(spec.at(i));
@@ -188,7 +199,7 @@ Shapee::Wave Shapee::get_window(const Wave& wave, int base_idx)
 Shapee::Wave Shapee::median_filter(const Wave& wave, int width) {
     Wave result(wave.size(), 0);
 
-#pragma omp parallel for
+// #pragma omp parallel for
     for (int i = 0; i < wave.size(); ++i) {
         int beg_idx = std::max(0, i - width);
         int end_idx = std::min(static_cast<int>(wave.size()-1), i + width);
@@ -245,15 +256,16 @@ Shapee::FFTBins Shapee::compute_fft(Wave& wave)
 {
     FFTBins bins(wave.size());
 
-    DFTI_DESCRIPTOR_HANDLE descriptor;
-    MKL_LONG status;
+    for (int i = 0; i < wave.size(); ++i) {
+        // in[i] = wave.at(i);
+        _fftw_double_data[i] = wave.at(i);
+    }
 
-    status = DftiCreateDescriptor(&descriptor, DFTI_SINGLE, DFTI_REAL, 1,
-                                  wave.size());
-    status = DftiSetValue(descriptor, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
-    status = DftiCommitDescriptor(descriptor);
-    status = DftiComputeForward(descriptor, wave.data(), bins.data());
-    status = DftiFreeDescriptor(&descriptor);
+    fftw_execute(_fft_plan);
+
+    for (int i = 0; i < wave.size(); ++i) {
+        bins.at(i) = std::complex<float>(_fftw_complex_data[i][0], _fftw_complex_data[i][1]);
+    }
 
     return bins;
 }
@@ -262,16 +274,16 @@ Shapee::Wave Shapee::compute_ifft(FFTBins& bins)
 {
     Wave wave(bins.size());
 
-    DFTI_DESCRIPTOR_HANDLE descriptor;
-    MKL_LONG status;
+    for (int i = 0; i < bins.size(); ++i) {
+        _fftw_complex_data[i][0] = bins.at(i).real();
+        _fftw_complex_data[i][1] = bins.at(i).imag();
+    }
 
-    status = DftiCreateDescriptor(&descriptor, DFTI_SINGLE, DFTI_REAL, 1,
-                                  wave.size());
-    status = DftiSetValue(descriptor, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
-    status = DftiSetValue(descriptor, DFTI_BACKWARD_SCALE, 1.0f / wave.size());
-    status = DftiCommitDescriptor(descriptor);
-    status = DftiComputeBackward(descriptor, bins.data(), wave.data());
-    status = DftiFreeDescriptor(&descriptor);
+    fftw_execute(_ifft_plan);
+
+    for (int i = 0; i < wave.size(); ++i) {
+        wave.at(i) = _fftw_double_data[i];
+    }
 
     return wave;
 }
